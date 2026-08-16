@@ -3,20 +3,22 @@ FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=UTC
 
-# Base packages + XFCE4 + TigerVNC + SSH (no Firefox yet)
+# Base packages + XFCE4 + TigerVNC + noVNC + SSH
 RUN apt-get update && apt-get install -y --no-install-recommends \
     openssh-server \
     tigervnc-standalone-server \
+    novnc \
+    websockify \
     xfce4 \
     xfce4-goodies \
     xfce4-terminal \
     dbus-x11 \
     x11-xserver-utils \
-    supervisor \
     curl \
     wget \
     ca-certificates \
     tzdata \
+    python3 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Firefox — Mozilla official APT repo (non-snap)
@@ -36,14 +38,16 @@ RUN apt-get remove -y firefox 2>/dev/null || true && \
 # SSH setup
 RUN mkdir -p /var/run/sshd && \
     sed -i 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config && \
-    sed -i 's/#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+    sed -i 's/#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config && \
+    echo "PasswordAuthentication yes" >> /etc/ssh/sshd_config && \
+    echo "PermitRootLogin yes"        >> /etc/ssh/sshd_config
 
-# VNC xstartup
-RUN mkdir -p /root/.vnc
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
+# noVNC served on 8080 (Railway public HTTP), VNC on 5901, SSH on 22
 EXPOSE 22
 EXPOSE 5901
+EXPOSE 8080
 
 CMD ["/start.sh"]
