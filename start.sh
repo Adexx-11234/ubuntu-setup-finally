@@ -12,9 +12,7 @@ VNCPASSWD_BIN=$(command -v vncpasswd || command -v tigervncpasswd || \
 if [[ -n "$VNCPASSWD_BIN" ]]; then
     echo "$VNC_PASSWORD" | "$VNCPASSWD_BIN" -f > /root/.vnc/passwd
 else
-    # Fallback: use python3 to write VNC DES-obfuscated passwd file
     python3 -c "
-import struct
 pw = ('${VNC_PASSWORD}'[:8]).encode().ljust(8, b'\x00')
 key = bytes([23,82,107,6,35,78,88,7])
 enc = bytes([p ^ k for p,k in zip(pw, key)])
@@ -47,5 +45,15 @@ mkdir -p /var/run/sshd
 pkill Xtigervnc 2>/dev/null || true
 rm -f /tmp/.X1-lock /tmp/.X11-unix/X1
 
-# ── Start VNC (blocks) ────────────────────────────────────────────────────
-exec vncserver :1 -geometry 1280x720 -depth 24 -fg
+# ── Start VNC ─────────────────────────────────────────────────────────────
+vncserver :1 -geometry 1280x720 -depth 24
+echo "VNC started on :5901"
+
+# ── Start noVNC (websockify) on port 8080 → proxies to VNC :5901 ──────────
+# Railway will expose 8080 as the public HTTP URL
+NOVNC_PATH=$(find /usr/share -name "vnc.html" 2>/dev/null | head -1 | xargs dirname || echo "/usr/share/novnc")
+websockify --web="$NOVNC_PATH" 8080 localhost:5901 &
+echo "noVNC started on :8080"
+
+# ── Block — keep container alive ──────────────────────────────────────────
+tail -f /dev/null
