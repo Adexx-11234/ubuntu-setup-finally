@@ -5,20 +5,8 @@ set -e
 VNC_PASSWORD="${VNC_PASSWORD:-changeme}"
 mkdir -p /root/.vnc
 
-VNCPASSWD_BIN=$(command -v vncpasswd || command -v tigervncpasswd || \
-    find /usr -name "vncpasswd" 2>/dev/null | head -1 || \
-    find /usr -name "tigervncpasswd" 2>/dev/null | head -1 || true)
-
-if [[ -n "$VNCPASSWD_BIN" ]]; then
-    echo "$VNC_PASSWORD" | "$VNCPASSWD_BIN" -f > /root/.vnc/passwd
-else
-    python3 -c "
-pw = ('${VNC_PASSWORD}'[:8]).encode().ljust(8, b'\x00')
-key = bytes([23,82,107,6,35,78,88,7])
-enc = bytes([p ^ k for p,k in zip(pw, key)])
-import sys; sys.stdout.buffer.write(enc)
-" > /root/.vnc/passwd
-fi
+# Write passwd file using tigervnc's own tool
+printf '%s\n%s\n\n' "$VNC_PASSWORD" "$VNC_PASSWORD" | vncpasswd /root/.vnc/passwd
 chmod 600 /root/.vnc/passwd
 
 # ── VNC xstartup ──────────────────────────────────────────────────────────
@@ -49,11 +37,10 @@ rm -f /tmp/.X1-lock /tmp/.X11-unix/X1
 vncserver :1 -geometry 1280x720 -depth 24
 echo "VNC started on :5901"
 
-# ── Start noVNC (websockify) on port 8080 → proxies to VNC :5901 ──────────
-# Railway will expose 8080 as the public HTTP URL
+# ── Start noVNC on port 8080 ──────────────────────────────────────────────
 NOVNC_PATH=$(find /usr/share -name "vnc.html" 2>/dev/null | head -1 | xargs dirname || echo "/usr/share/novnc")
 websockify --web="$NOVNC_PATH" 8080 localhost:5901 &
-echo "noVNC started on :8080"
+echo "noVNC started on :8080 → vnc.html"
 
-# ── Block — keep container alive ──────────────────────────────────────────
+# ── Block ──────────────────────────────────────────────────────────────────
 tail -f /dev/null
