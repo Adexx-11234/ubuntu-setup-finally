@@ -43,12 +43,16 @@ RUN mkdir -p /var/run/sshd && \
     echo "PasswordAuthentication yes" >> /etc/ssh/sshd_config && \
     echo "PermitRootLogin yes"        >> /etc/ssh/sshd_config
 
+# Pre-create 512MB swap
+RUN dd if=/dev/zero of=/swapfile bs=1M count=512 && \
+    chmod 600 /swapfile && \
+    mkswap /swapfile
+
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
 # noVNC served on 8080 (Railway public HTTP), VNC on 5901, SSH on 22
 EXPOSE 22
-EXPOSE 5901
 EXPOSE 8080
 
 CMD ["/start.sh"]
