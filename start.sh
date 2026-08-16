@@ -4,7 +4,23 @@ set -e
 # ── VNC password from env ──────────────────────────────────────────────────
 VNC_PASSWORD="${VNC_PASSWORD:-changeme}"
 mkdir -p /root/.vnc
-echo "$VNC_PASSWORD" | vncpasswd -f > /root/.vnc/passwd
+
+VNCPASSWD_BIN=$(command -v vncpasswd || command -v tigervncpasswd || \
+    find /usr -name "vncpasswd" 2>/dev/null | head -1 || \
+    find /usr -name "tigervncpasswd" 2>/dev/null | head -1 || true)
+
+if [[ -n "$VNCPASSWD_BIN" ]]; then
+    echo "$VNC_PASSWORD" | "$VNCPASSWD_BIN" -f > /root/.vnc/passwd
+else
+    # Fallback: use python3 to write VNC DES-obfuscated passwd file
+    python3 -c "
+import struct
+pw = ('${VNC_PASSWORD}'[:8]).encode().ljust(8, b'\x00')
+key = bytes([23,82,107,6,35,78,88,7])
+enc = bytes([p ^ k for p,k in zip(pw, key)])
+import sys; sys.stdout.buffer.write(enc)
+" > /root/.vnc/passwd
+fi
 chmod 600 /root/.vnc/passwd
 
 # ── VNC xstartup ──────────────────────────────────────────────────────────
